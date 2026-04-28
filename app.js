@@ -325,21 +325,15 @@ async function openScanner(mode) {
     return;
   }
 
-  const formats = mode === "ean"
-    ? [
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.CODE_128,
-      ]
-    : [Html5QrcodeSupportedFormats.QR_CODE];
-
-  state.scanner = new Html5Qrcode("qr-reader", { formatsToSupport: formats });
+  // Accetta tutti i formati: il campo `mode` ("ean"/"qr") determina solo come
+  // INTERPRETIAMO il codice rilevato, non quali formati il lettore accetta.
+  // Senza qrbox lo scanner analizza l'INTERA immagine — molto più tollerante
+  // a inquadrature imprecise.
+  state.scanner = new Html5Qrcode("qr-reader");
   try {
     await state.scanner.start(
       { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 260, height: mode === "ean" ? 130 : 260 } },
+      { fps: 15 },
       (decodedText) => onScanSuccess(decodedText),
       () => {} // ignore per-frame failures
     );
@@ -349,18 +343,26 @@ async function openScanner(mode) {
   }
 }
 
-async function closeScanner() {
-  if (state.scanner) {
-    try { await state.scanner.stop(); } catch (e) {}
-    try { state.scanner.clear(); } catch (e) {}
-    state.scanner = null;
-  }
+function closeScanner() {
+  // Hide the view IMMEDIATELY so the user is never stuck on a frozen scanner
+  // screen if .stop() hangs (it can on some mobile browsers). Cleanup runs in
+  // the background — we don't await it.
   showView("new");
+  if (state.scanner) {
+    const sc = state.scanner;
+    state.scanner = null;
+    Promise.resolve().then(async () => {
+      try { await sc.stop(); } catch (e) { /* ignore */ }
+      try { sc.clear(); } catch (e) { /* ignore */ }
+    });
+  }
 }
 
 async function onScanSuccess(decoded) {
-  // Stop subito per evitare scan multipli
-  await closeScanner();
+  // Guard: la libreria può chiamare il callback più volte per lo stesso
+  // frame; ignoriamo tutto dopo la prima chiusura.
+  if (!state.scanner) return;
+  closeScanner();
 
   if (state.scanMode === "ean") {
     // EAN-13/8 sono solo cifre; UPC-A/E pure
@@ -562,6 +564,7 @@ function attachHandlers() {
   $("#btn-scan-ean").addEventListener("click", () => openScanner("ean"));
   $("#btn-scan-qr").addEventListener("click", () => openScanner("qr"));
   $("#btn-scan-close").addEventListener("click", closeScanner);
+  $("#btn-scan-close-bottom").addEventListener("click", closeScanner);
 
   $("#btn-settings").addEventListener("click", openSettings);
   $("#btn-settings-back").addEventListener("click", () => showView("home"));
@@ -569,6 +572,17 @@ function attachHandlers() {
   $("#btn-toggle-key").addEventListener("click", () => {
     const inp = $("#input-api-key");
     inp.type = inp.type === "password" ? "text" : "password";
+  });
+  // Auto-save: persist the key as soon as the user types/pastes it. The "Test
+  // connessione" button is now just a verification step — saving doesn't
+  // depend on success.
+  $("#input-api-key").addEventListener("input", () => {
+    const key = $("#input-api-key").value.trim();
+    if (key) {
+      localStorage.setItem(LS_API_KEY, key);
+    } else {
+      localStorage.removeItem(LS_API_KEY);
+    }
   });
   $("#btn-reset").addEventListener("click", resetSession);
 
