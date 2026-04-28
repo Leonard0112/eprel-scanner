@@ -158,7 +158,7 @@ function dotWarning(value) {
 
 // ─── EPREL API ─────────────────────────────────────────────
 async function fetchEprelPreview(eprelId) {
-  const apiKey = localStorage.getItem(LS_API_KEY);
+  const apiKey = sanitizeApiKey(localStorage.getItem(LS_API_KEY) || "");
   if (!apiKey) return null;
 
   // Cache hit?
@@ -399,27 +399,60 @@ async function onScanSuccess(decoded) {
     state.draft.ean = digits;
     saveSessionDebounced();
   } else {
-    // QR mode: accetta SOLO QR EPREL ufficiali. Tante gomme hanno più QR
-    // (codici fornitore, marchi del distributore...) — l'unico utile è
-    // quello dell'etichetta UE che punta a eprel.ec.europa.eu/qr/<id> o
-    // /screen/product/tyres/<id>.
-    const isEprelUrl = /eprel\.ec\.europa\.eu/i.test(decoded);
-    const m = decoded.match(/\/(?:qr|tyres)\/(\d+)/i);
-    if (!m || !isEprelUrl) {
+    // QR mode: prova a estrarre l'ID EPREL dal contenuto. Strategia:
+    //   1. URL EPREL standard (qr/, tyres/, product/) → usa direttamente
+    //   2. Solo numero → trattalo come ID
+    //   3. URL non EPREL ma con un numero → chiedi conferma all'utente
+    //   4. Altro → mostra errore con il contenuto letto
+    const id = extractEprelId(decoded);
+    if (!id) {
       alert(
-        "Questo non è un QR EPREL.\n\n" +
-        "Letto: " + decoded.substring(0, 120) + "\n\n" +
-        "Atteso un URL del tipo:\nhttps://eprel.ec.europa.eu/qr/<numero>"
+        "QR non riconosciuto come EPREL.\n\n" +
+        "Letto: " + decoded.substring(0, 200) + "\n\n" +
+        "Atteso un URL EPREL o un ID numerico. " +
+        "Puoi anche inserire l'ID a mano nel campo qui sotto."
       );
       return;
     }
-    const id = m[1];
     $("#input-eprel").value = id;
     state.draft.eprel_id = id;
     saveSessionDebounced();
     // Trigger preview fetch
     await loadPreview(id);
   }
+}
+
+// ─── Estrai EPREL ID da varie forme (URL, ID nudo, testo) ──────
+function extractEprelId(text) {
+  if (!text) return null;
+  const s = String(text).trim();
+  if (!s) return null;
+
+  // 1. URL EPREL standard: /qr/12345, /tyres/12345, /product/...12345
+  const urlMatch = s.match(/\/(?:qr|tyres|product)[a-z\/]*\/(\d{3,10})/i);
+  if (urlMatch) return urlMatch[1];
+
+  // 2. Solo numero (es. "2419173" o "  2419173  ")
+  if (/^\d{3,10}$/.test(s)) return s;
+
+  // 3. Contiene esattamente un numero ragionevole come ID — chiedi conferma
+  const numbers = s.match(/\d{3,10}/g);
+  if (numbers && numbers.length === 1) {
+    const ok = confirm(
+      `Letto: ${s.substring(0, 120)}\n\n` +
+      `Non è un URL EPREL standard. Provo a usare il numero ${numbers[0]} come ID. OK?`
+    );
+    return ok ? numbers[0] : null;
+  }
+  if (numbers && numbers.length > 1) {
+    const longest = numbers.sort((a, b) => b.length - a.length)[0];
+    const ok = confirm(
+      `Letto: ${s.substring(0, 120)}\n\n` +
+      `Più numeri trovati. Uso il più lungo: ${longest}. OK?`
+    );
+    return ok ? longest : null;
+  }
+  return null;
 }
 
 // ─── Preview ───────────────────────────────────────────────
@@ -529,8 +562,19 @@ function openSettings() {
   showView("settings");
 }
 
+function sanitizeApiKey(value) {
+  // Rimuove TUTTI i caratteri whitespace (inclusi non-breaking space, zero-width
+  // space e tabulazioni) che vengono frequentemente inseriti dal copia-incolla
+  // di iOS dal PDF. .trim() da solo non basta: lascia gli spazi interni.
+  return String(value || "").replace(/[\s ​‌‍﻿]/g, "");
+}
+
 async function testApiKey() {
-  const key = $("#input-api-key").value.trim();
+  const inp = $("#input-api-key");
+  const key = sanitizeApiKey(inp.value);
+  // Riscrivi nel campo la chiave pulita: l'utente vede subito se c'erano
+  // caratteri estranei (la lunghezza cambia)
+  if (inp.value !== key) inp.value = key;
   const out = $("#test-key-result");
   if (!key) {
     out.textContent = "Inserisci una chiave da testare.";
@@ -609,7 +653,7 @@ function attachHandlers() {
   // connessione" button is now just a verification step — saving doesn't
   // depend on success.
   $("#input-api-key").addEventListener("input", () => {
-    const key = $("#input-api-key").value.trim();
+    const key = sanitizeApiKey($("#input-api-key").value);
     if (key) {
       localStorage.setItem(LS_API_KEY, key);
     } else {
@@ -650,7 +694,17 @@ function attachHandlers() {
   // Manual EAN/EPREL entry → auto-save (e preview se EPREL)
   $("#input-ean").addEventListener("input", saveSessionDebounced);
   $("#input-eprel").addEventListener("change", () => {
-    const id = $("#input-eprel").value.trim();
+    const inp = $("#input-eprel");
+    const raw = inp.value.trim();
+    if (!raw) {
+      saveSessionDebounced();
+      return;
+    }
+    // Auto-extract ID if user pasted a URL (or kept the URL as-is)
+    const id = extractEprelId(raw);
+    if (id && id !== raw) {
+      inp.value = id;
+    }
     if (id) loadPreview(id);
     saveSessionDebounced();
   });
