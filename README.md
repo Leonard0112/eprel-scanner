@@ -5,13 +5,14 @@ App web installabile su iPhone e Android per scansionare l'EAN e il QR code dell
 ## Funzionalità
 
 - 📷 Scansione **EAN** (barcode lineare) e **QR EPREL** con la fotocamera del telefono
-- 👁 Preview live opzionale con dati EPREL (Marca, Misura, Codice velocità, Energia, Bagnato, Rumore) — richiede una API Key EPREL valida
 - 🔢 Quantità + DOT (con avviso automatico se il DOT è più vecchio di 2 anni) + Note
 - 💾 **Salvataggio progressivo** in localStorage + backup ridondante in IndexedDB ogni 10 articoli
 - 🔄 Resume automatico della sessione alla riapertura
 - 📤 Export CSV (con BOM per Excel) condivisibile via Web Share API o download diretto
 - 📱 Installabile come app nella home screen (PWA)
 - 🌐 Funziona su iOS Safari ≥14, Android Chrome, desktop Chrome/Firefox
+
+> L'app NON chiama l'API EPREL: si limita a raccogliere EAN + codice EPREL. La popolazione dei dati EPREL avviene poi sul PC tramite il tool desktop, dove la API key è gestita in modo centralizzato.
 
 ## Struttura file
 
@@ -70,28 +71,23 @@ Per testare la fotocamera dal telefono in rete locale serve HTTPS (es. usando `m
 2. Tocca **+ Nuovo pneumatico**
 3. Tocca 📷 sul campo EAN → scansiona il barcode dell'adesivo Tyre24/distributore
 4. Tocca 📷 sul campo EPREL → scansiona il QR code dell'etichetta UE
-5. (Se hai impostato l'API key) verifica visivamente la preview che appare
-6. Imposta **Quantità** e **DOT** se rilevanti
-7. Tocca **Aggiungi a lista**
-8. Ripeti per ogni gomma. La lista è sempre persistita.
-9. A fine sessione: tocca **Esporta CSV** sulla home → scegli destinazione (AirDrop/email/iCloud)
-10. Sul Mac/PC apri il CSV col tool desktop `eprel_matcher.py` per popolare il template Tyre24
+5. Imposta **Quantità** e **DOT** se rilevanti
+6. Tocca **Aggiungi a lista**
+7. Ripeti per ogni gomma. La lista è sempre persistita.
+8. A fine sessione: tocca **Esporta CSV** sulla home → scegli destinazione (AirDrop/email/iCloud)
+9. Sul Mac/PC apri il CSV col tool desktop `eprel_matcher.py` per popolare il template Tyre24
 
 ## Impostazioni (icona ⚙)
 
-- **API Key EPREL** — facoltativa. Senza, la scansione funziona ma niente preview.
-- **Test connessione** — verifica che la chiave sia valida.
-- **Cancella sessione** — elimina tutti gli articoli scansionati (l'API key resta).
+- **Cancella sessione** — elimina tutti gli articoli scansionati. Operazione irreversibile.
 
 ## Privacy & sicurezza
 
 - Tutti i dati restano sul tuo dispositivo (localStorage + IndexedDB)
-- L'API Key viene salvata in chiaro nel browser (come fa qualsiasi PWA con auth)
+- Nessuna chiamata di rete: l'app non comunica con server esterni durante l'uso
 - Nessun tracker, nessun analytics, nessun server intermedio
-- Le chiamate EPREL vanno direttamente da browser→`eprel.ec.europa.eu`
 
 ## Limitazioni note
 
 - iOS Safari può svuotare i dati di siti non aperti per >7 giorni. La PWA installata "Add to Home" è esente, ma il backup IDB ogni 10 articoli aggiunge ulteriore resilienza.
 - Lo scanner richiede buona illuminazione e fuoco a 10-15 cm dal codice
-- L'API EPREL ha limite 5 req/sec; la preview cache evita chiamate ripetute sullo stesso ID

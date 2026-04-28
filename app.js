@@ -7,17 +7,12 @@
 
 // ─── Storage keys ──────────────────────────────────────────
 const LS_SESSION = "eprel_scanner_session";
-const LS_API_KEY = "eprel_scanner_api_key";
-const LS_PREVIEW_PREFIX = "eprel_preview_";
 const IDB_NAME = "eprel_scanner_backup";
 const IDB_STORE = "items";
 
-// ─── EPREL config ──────────────────────────────────────────
-const EPREL_BASE = "https://eprel.ec.europa.eu/api/products/tyres";
-
 // ─── State ─────────────────────────────────────────────────
 const state = {
-  items: [],          // [{id, ean, eprel_id, dot, qty, notes, ts, brand, model, size, speed, energy, wet, noise}]
+  items: [],          // [{id, ean, eprel_id, dot, qty, notes, ts}]
   draft: null,        // currently editing item (in view-new)
   scanner: null,      // html5Qrcode instance
   scanMode: null,     // "ean" | "qr"
@@ -156,38 +151,6 @@ function dotWarning(value) {
   return null;
 }
 
-// ─── EPREL API ─────────────────────────────────────────────
-async function fetchEprelPreview(eprelId) {
-  const apiKey = localStorage.getItem(LS_API_KEY);
-  if (!apiKey) return null;
-
-  // Cache hit?
-  try {
-    const cached = sessionStorage.getItem(LS_PREVIEW_PREFIX + eprelId);
-    if (cached) return JSON.parse(cached);
-  } catch (e) {}
-
-  const url = `${EPREL_BASE}?eprelRegistrationNumber=${encodeURIComponent(eprelId)}&_limit=1`;
-  const resp = await fetch(url, {
-    headers: { "x-api-key": apiKey, Accept: "application/json" },
-  });
-  if (!resp.ok) {
-    if (resp.status === 401 || resp.status === 403) {
-      throw new Error("API Key non valida o non attiva (HTTP " + resp.status + ")");
-    }
-    throw new Error("EPREL HTTP " + resp.status);
-  }
-  const data = await resp.json();
-  const hits = (data && data.hits) || [];
-  const record = hits[0] || null;
-  if (record) {
-    try {
-      sessionStorage.setItem(LS_PREVIEW_PREFIX + eprelId, JSON.stringify(record));
-    } catch (e) {}
-  }
-  return record;
-}
-
 // ─── Render: home ──────────────────────────────────────────
 function renderHome() {
   $("#count-num").textContent = state.items.length;
@@ -200,14 +163,10 @@ function renderHome() {
     const li = document.createElement("li");
     const eanShort = item.ean ? item.ean : "—";
     const eprelShort = item.eprel_id ? item.eprel_id : "—";
-    const brandLine = item.brand
-      ? `${item.brand}${item.size ? " · " + item.size : ""}${item.speed ? " " + item.speed : ""}`
-      : "";
     const dotInfo = item.dot ? ` · DOT ${item.dot}` : "";
     li.innerHTML = `
       <span class="item-id">${escapeHtml(item.id)}</span>
       <div class="item-main">
-        ${brandLine ? `<div>${escapeHtml(brandLine)}</div>` : ""}
         <div class="item-codes">EAN ${escapeHtml(eanShort)} · EPREL ${escapeHtml(eprelShort)}</div>
         <div class="item-meta">${escapeHtml(item.notes || "")}${dotInfo}</div>
       </div>
@@ -274,7 +233,6 @@ function startNewItem() {
   $("#dot-hint").hidden = true;
   $("#dot-hint").textContent = "";
   $("#input-dot").classList.remove("warning");
-  hidePreview();
   showView("new");
 }
 
@@ -292,17 +250,6 @@ function commitDraft() {
   state.draft.qty = Math.max(1, parseInt($("#input-qty").value, 10) || 1);
   state.draft.notes = $("#input-notes").value.trim();
   state.draft.ts = new Date().toISOString();
-  // Snapshot of fetched preview if any
-  const prevBrand = $("#prev-brand").textContent;
-  if (prevBrand) {
-    state.draft.brand = prevBrand;
-    state.draft.model = $("#prev-model").textContent;
-    state.draft.size = $("#prev-size").textContent;
-    state.draft.speed = $("#prev-speed").textContent;
-    state.draft.energy = $("#prev-energy").textContent;
-    state.draft.wet = $("#prev-wet").textContent;
-    state.draft.noise = $("#prev-noise").textContent;
-  }
   state.items.push(state.draft);
   state.draft = null;
   saveSession();
@@ -383,62 +330,6 @@ async function onScanSuccess(decoded) {
     $("#input-eprel").value = id;
     state.draft.eprel_id = id;
     saveSessionDebounced();
-    // Trigger preview fetch
-    await loadPreview(id);
-  }
-}
-
-// ─── Preview ───────────────────────────────────────────────
-function hidePreview() {
-  $("#preview-card").hidden = true;
-  $(".preview-loading").hidden = true;
-  $(".preview-error").hidden = true;
-  $(".preview-content").hidden = true;
-  $("#prev-brand").textContent = "";
-  $("#prev-model").textContent = "";
-  $("#prev-size").textContent = "";
-  $("#prev-speed").textContent = "";
-  $("#prev-energy").textContent = "—";
-  $("#prev-wet").textContent = "—";
-  $("#prev-noise").textContent = "—";
-}
-
-async function loadPreview(eprelId) {
-  const apiKey = localStorage.getItem(LS_API_KEY);
-  if (!apiKey) return; // niente chiave → niente preview
-
-  const card = $("#preview-card");
-  const loading = card.querySelector(".preview-loading");
-  const error = card.querySelector(".preview-error");
-  const content = card.querySelector(".preview-content");
-  card.hidden = false;
-  loading.hidden = false;
-  error.hidden = true;
-  content.hidden = true;
-
-  try {
-    const rec = await fetchEprelPreview(eprelId);
-    loading.hidden = true;
-    if (!rec) {
-      error.textContent = "Nessun dato EPREL per ID " + eprelId;
-      error.hidden = false;
-      return;
-    }
-    $("#prev-brand").textContent = rec.supplierOrTrademark || "";
-    $("#prev-model").textContent = rec.commercialName || rec.modelIdentifier || "";
-    $("#prev-size").textContent = rec.tyreDesignation || rec.sizeDesignation || "";
-    $("#prev-speed").textContent = rec.speedCategorySymbol || "—";
-    $("#prev-energy").textContent = rec.energyClass || "—";
-    $("#prev-wet").textContent = rec.wetGripClass || "—";
-    $("#prev-noise").textContent =
-      rec.externalRollingNoiseValue != null
-        ? rec.externalRollingNoiseValue + " dB"
-        : "—";
-    content.hidden = false;
-  } catch (e) {
-    loading.hidden = true;
-    error.textContent = "Errore preview: " + e.message;
-    error.hidden = false;
   }
 }
 
@@ -490,38 +381,7 @@ function downloadBlob(url, filename) {
 
 // ─── Settings ──────────────────────────────────────────────
 function openSettings() {
-  $("#input-api-key").value = localStorage.getItem(LS_API_KEY) || "";
-  $("#test-key-result").textContent = "";
   showView("settings");
-}
-
-async function testApiKey() {
-  const key = $("#input-api-key").value.trim();
-  const out = $("#test-key-result");
-  if (!key) {
-    out.textContent = "Inserisci una chiave da testare.";
-    return;
-  }
-  out.textContent = "Test in corso…";
-  try {
-    const resp = await fetch(`${EPREL_BASE}?_limit=1`, {
-      headers: { "x-api-key": key, Accept: "application/json" },
-    });
-    if (resp.ok) {
-      out.textContent = "✓ Chiave valida.";
-      out.style.color = "var(--success)";
-      localStorage.setItem(LS_API_KEY, key);
-    } else if (resp.status === 401 || resp.status === 403) {
-      out.textContent = `✗ Chiave non valida o non attiva (HTTP ${resp.status})`;
-      out.style.color = "var(--danger)";
-    } else {
-      out.textContent = `✗ Errore HTTP ${resp.status}`;
-      out.style.color = "var(--danger)";
-    }
-  } catch (e) {
-    out.textContent = "✗ Errore di rete: " + e.message;
-    out.style.color = "var(--danger)";
-  }
 }
 
 function resetSession() {
@@ -555,7 +415,6 @@ function attachHandlers() {
 
   $("#btn-settings").addEventListener("click", openSettings);
   $("#btn-settings-back").addEventListener("click", () => showView("home"));
-  $("#btn-test-key").addEventListener("click", testApiKey);
   $("#btn-reset").addEventListener("click", resetSession);
 
   $("#btn-qty-minus").addEventListener("click", () => {
@@ -587,13 +446,9 @@ function attachHandlers() {
     saveSessionDebounced();
   });
 
-  // Manual EAN/EPREL entry → auto-save (e preview se EPREL)
+  // Manual EAN/EPREL entry → auto-save
   $("#input-ean").addEventListener("input", saveSessionDebounced);
-  $("#input-eprel").addEventListener("change", () => {
-    const id = $("#input-eprel").value.trim();
-    if (id) loadPreview(id);
-    saveSessionDebounced();
-  });
+  $("#input-eprel").addEventListener("input", saveSessionDebounced);
   $("#input-notes").addEventListener("input", saveSessionDebounced);
 }
 

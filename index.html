@@ -64,22 +64,6 @@
         </div>
       </div>
 
-      <div id="preview-card" class="preview-card" hidden>
-        <div class="preview-loading" hidden>Caricamento dati EPREL…</div>
-        <div class="preview-error" hidden></div>
-        <div class="preview-content" hidden>
-          <div class="preview-row preview-brand"><span class="lbl">Marca</span><strong id="prev-brand"></strong></div>
-          <div class="preview-row"><span class="lbl">Modello</span><span id="prev-model"></span></div>
-          <div class="preview-row"><span class="lbl">Misura</span><span id="prev-size"></span></div>
-          <div class="preview-row preview-speed"><span class="lbl">Cod. velocità</span><strong id="prev-speed"></strong></div>
-          <div class="preview-grid">
-            <div><span class="lbl">Energia</span><strong id="prev-energy">—</strong></div>
-            <div><span class="lbl">Bagnato</span><strong id="prev-wet">—</strong></div>
-            <div><span class="lbl">Rumore</span><strong id="prev-noise">—</strong></div>
-          </div>
-        </div>
-      </div>
-
       <div class="field">
         <label for="input-qty">Quantità</label>
         <div class="qty-row">
@@ -124,19 +108,13 @@
       <h1>Impostazioni</h1>
     </header>
     <div class="form-area">
-      <div class="field">
-        <label for="input-api-key">API Key EPREL (opzionale, abilita la preview)</label>
-        <input id="input-api-key" type="password" autocomplete="off" placeholder="UHASW…">
-        <p class="hint">Salvata localmente sul dispositivo. Senza chiave la scansione funziona, manca solo la preview.</p>
-      </div>
-      <button id="btn-test-key" class="btn btn-secondary">Test connessione</button>
-      <p id="test-key-result" class="hint"></p>
+      <p class="hint">L'app raccoglie EAN + codice EPREL durante la scansione. La popolazione dei dati EPREL avviene poi sul PC tramite il tool desktop.</p>
 
       <hr>
       <div class="danger-zone">
         <h3>Zona pericolosa</h3>
         <button id="btn-reset" class="btn btn-danger">Cancella sessione corrente</button>
-        <p class="hint">Cancella tutti gli articoli scansionati, l'API key resta.</p>
+        <p class="hint">Cancella tutti gli articoli scansionati. Operazione irreversibile.</p>
       </div>
     </div>
   </section>

@@ -1,7 +1,7 @@
 // Cache shell statici per "Add to Home Screen" e funzionamento offline base.
 // Le chiamate verso EPREL passano dalla rete (no cache) — la preview è sempre fresca.
 
-const CACHE_NAME = "eprel-scanner-v1";
+const CACHE_NAME = "eprel-scanner-v2";
 const SHELL = [
   "./",
   "./index.html",
