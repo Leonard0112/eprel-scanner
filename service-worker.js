@@ -1,7 +1,7 @@
 // Cache shell statici per "Add to Home Screen" e funzionamento offline base.
 // Le chiamate verso EPREL passano dalla rete (no cache) — la preview è sempre fresca.
 
-const CACHE_NAME = "eprel-scanner-v4";
+const CACHE_NAME = "eprel-scanner-v5";
 const SHELL = [
   "./",
   "./index.html",
@@ -36,9 +36,10 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // EPREL API: sempre via rete (non cachare risposte API)
+  // EPREL API: lascia gestire al browser nativamente. Non chiamiamo
+  // event.respondWith — il browser fa fetch standard, applica CORS regolare,
+  // niente interferenze del service worker.
   if (url.hostname === "eprel.ec.europa.eu") {
-    event.respondWith(fetch(event.request));
     return;
   }
 

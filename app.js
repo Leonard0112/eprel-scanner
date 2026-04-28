@@ -500,26 +500,36 @@ async function testApiKey() {
   const out = $("#test-key-result");
   if (!key) {
     out.textContent = "Inserisci una chiave da testare.";
+    out.style.color = "var(--text-muted)";
     return;
   }
-  out.textContent = "Test in corso…";
+  out.textContent = "Test in corso… (lunghezza chiave: " + key.length + ")";
+  out.style.color = "var(--text-muted)";
   try {
     const resp = await fetch(`${EPREL_BASE}?_limit=1`, {
       headers: { "x-api-key": key, Accept: "application/json" },
     });
     if (resp.ok) {
-      out.textContent = "✓ Chiave valida.";
+      out.textContent = "✓ Chiave valida e attiva.";
       out.style.color = "var(--success)";
       localStorage.setItem(LS_API_KEY, key);
     } else if (resp.status === 401 || resp.status === 403) {
-      out.textContent = `✗ Chiave non valida o non attiva (HTTP ${resp.status})`;
+      out.textContent = `✗ Chiave rifiutata (HTTP ${resp.status}). Verifica di aver copiato la chiave senza spazi/caratteri extra.`;
       out.style.color = "var(--danger)";
     } else {
       out.textContent = `✗ Errore HTTP ${resp.status}`;
       out.style.color = "var(--danger)";
     }
   } catch (e) {
-    out.textContent = "✗ Errore di rete: " + e.message;
+    // Browser fetch throws TypeError for CORS-blocked responses too. EPREL
+    // returns 403 senza header CORS quando la chiave è invalida, e il browser
+    // lo segnala come errore di rete generico. Quindi: chiave sbagliata è la
+    // causa di gran lunga più probabile.
+    out.innerHTML =
+      "✗ Errore di rete.<br>" +
+      "Causa più probabile: chiave incollata male (spazi, caratteri mancanti, righe nuove). " +
+      "Tocca 👁 per controllare quello che hai inserito.<br>" +
+      "<small>Dettaglio: " + escapeHtml(e.message || String(e)) + "</small>";
     out.style.color = "var(--danger)";
   }
 }
@@ -556,6 +566,10 @@ function attachHandlers() {
   $("#btn-settings").addEventListener("click", openSettings);
   $("#btn-settings-back").addEventListener("click", () => showView("home"));
   $("#btn-test-key").addEventListener("click", testApiKey);
+  $("#btn-toggle-key").addEventListener("click", () => {
+    const inp = $("#input-api-key");
+    inp.type = inp.type === "password" ? "text" : "password";
+  });
   $("#btn-reset").addEventListener("click", resetSession);
 
   $("#btn-qty-minus").addEventListener("click", () => {

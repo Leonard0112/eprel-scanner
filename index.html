@@ -126,7 +126,10 @@
     <div class="form-area">
       <div class="field">
         <label for="input-api-key">API Key EPREL (abilita la preview)</label>
-        <input id="input-api-key" type="password" autocomplete="off" placeholder="UHASW…">
+        <div class="scan-row">
+          <input id="input-api-key" type="password" autocomplete="off" placeholder="UHASW…">
+          <button id="btn-toggle-key" class="btn btn-step" type="button" aria-label="Mostra/nascondi">👁</button>
+        </div>
         <p class="hint">Salvata localmente sul dispositivo. Senza chiave la scansione funziona, manca solo la preview.</p>
       </div>
       <button id="btn-test-key" class="btn btn-secondary">Test connessione</button>
