@@ -1,7 +1,7 @@
 // Cache shell statici per "Add to Home Screen" e funzionamento offline base.
 // Le chiamate verso EPREL passano dalla rete (no cache) — la preview è sempre fresca.
 
-const CACHE_NAME = "eprel-scanner-v2";
+const CACHE_NAME = "eprel-scanner-v3";
 const SHELL = [
   "./",
   "./index.html",
@@ -10,7 +10,7 @@ const SHELL = [
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.10/html5-qrcode.min.js",
+  "https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js",
 ];
 
 self.addEventListener("install", (event) => {
