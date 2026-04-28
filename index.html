@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1c4c99">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="EPREL Scanner">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <title>EPREL Tyre Scanner</title>
+</head>
+<body>
+  <div id="save-toast" class="toast" hidden>✓ Salvato</div>
+
+  <!-- HOME -->
+  <section id="view-home" class="view active">
+    <header class="topbar">
+      <h1>EPREL Scanner</h1>
+      <button id="btn-settings" class="icon-btn" aria-label="Impostazioni">⚙</button>
+    </header>
+
+    <div id="resume-banner" class="banner" hidden></div>
+
+    <div class="counter">
+      <span id="count-num">0</span>
+      <span class="counter-label">articoli scansionati</span>
+    </div>
+
+    <div class="actions-row">
+      <button id="btn-new" class="btn btn-primary">+ Nuovo pneumatico</button>
+      <button id="btn-export" class="btn btn-secondary">Esporta CSV</button>
+    </div>
+
+    <ul id="items-list" class="items-list" aria-label="Lista articoli scansionati"></ul>
+
+    <p id="empty-state" class="empty-state">Nessun articolo. Premi "Nuovo pneumatico" per iniziare.</p>
+  </section>
+
+  <!-- NEW ITEM -->
+  <section id="view-new" class="view">
+    <header class="topbar">
+      <button id="btn-back" class="icon-btn" aria-label="Indietro">‹</button>
+      <h1>Nuovo pneumatico</h1>
+      <span id="seq-id" class="seq-id">S0001</span>
+    </header>
+
+    <div class="form-area">
+      <div class="scan-block">
+        <label class="scan-label">EAN code</label>
+        <div class="scan-row">
+          <input id="input-ean" type="text" inputmode="numeric" placeholder="13 cifre" autocomplete="off">
+          <button id="btn-scan-ean" class="btn btn-scan" aria-label="Scansiona EAN">📷</button>
+        </div>
+      </div>
+
+      <div class="scan-block">
+        <label class="scan-label">Codice EPREL (da QR)</label>
+        <div class="scan-row">
+          <input id="input-eprel" type="text" inputmode="numeric" placeholder="es. 2419173" autocomplete="off">
+          <button id="btn-scan-qr" class="btn btn-scan" aria-label="Scansiona QR">📷</button>
+        </div>
+      </div>
+
+      <div id="preview-card" class="preview-card" hidden>
+        <div class="preview-loading" hidden>Caricamento dati EPREL…</div>
+        <div class="preview-error" hidden></div>
+        <div class="preview-content" hidden>
+          <div class="preview-row preview-brand"><span class="lbl">Marca</span><strong id="prev-brand"></strong></div>
+          <div class="preview-row"><span class="lbl">Modello</span><span id="prev-model"></span></div>
+          <div class="preview-row"><span class="lbl">Misura</span><span id="prev-size"></span></div>
+          <div class="preview-row preview-speed"><span class="lbl">Cod. velocità</span><strong id="prev-speed"></strong></div>
+          <div class="preview-grid">
+            <div><span class="lbl">Energia</span><strong id="prev-energy">—</strong></div>
+            <div><span class="lbl">Bagnato</span><strong id="prev-wet">—</strong></div>
+            <div><span class="lbl">Rumore</span><strong id="prev-noise">—</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="input-qty">Quantità</label>
+        <div class="qty-row">
+          <button class="btn btn-step" id="btn-qty-minus" type="button" aria-label="Diminuisci">−</button>
+          <input id="input-qty" type="number" min="1" value="1" inputmode="numeric">
+          <button class="btn btn-step" id="btn-qty-plus" type="button" aria-label="Aumenta">+</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="input-dot">DOT (4 cifre, es. 4824)</label>
+        <input id="input-dot" type="text" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="WWYY o YYYY">
+        <p id="dot-hint" class="hint" hidden></p>
+      </div>
+
+      <div class="field">
+        <label for="input-notes">Note (opzionale)</label>
+        <textarea id="input-notes" rows="2" placeholder="Es. difetti, posizione magazzino"></textarea>
+      </div>
+    </div>
+
+    <div class="bottom-actions">
+      <button id="btn-cancel" class="btn btn-ghost">Annulla</button>
+      <button id="btn-add" class="btn btn-primary">Aggiungi a lista</button>
+    </div>
+  </section>
+
+  <!-- SCANNER -->
+  <section id="view-scanner" class="view view-scanner">
+    <header class="topbar topbar-scanner">
+      <button id="btn-scan-close" class="icon-btn" aria-label="Chiudi">✕</button>
+      <h1 id="scan-title">Scansiona</h1>
+    </header>
+    <div id="qr-reader"></div>
+    <p id="scan-hint" class="scan-hint">Inquadra il codice</p>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="view-settings" class="view">
+    <header class="topbar">
+      <button id="btn-settings-back" class="icon-btn" aria-label="Indietro">‹</button>
+      <h1>Impostazioni</h1>
+    </header>
+    <div class="form-area">
+      <div class="field">
+        <label for="input-api-key">API Key EPREL (opzionale, abilita la preview)</label>
+        <input id="input-api-key" type="password" autocomplete="off" placeholder="UHASW…">
+        <p class="hint">Salvata localmente sul dispositivo. Senza chiave la scansione funziona, manca solo la preview.</p>
+      </div>
+      <button id="btn-test-key" class="btn btn-secondary">Test connessione</button>
+      <p id="test-key-result" class="hint"></p>
+
+      <hr>
+      <div class="danger-zone">
+        <h3>Zona pericolosa</h3>
+        <button id="btn-reset" class="btn btn-danger">Cancella sessione corrente</button>
+        <p class="hint">Cancella tutti gli articoli scansionati, l'API key resta.</p>
+      </div>
+    </div>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.10/html5-qrcode.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
