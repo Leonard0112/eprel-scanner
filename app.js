@@ -325,11 +325,25 @@ async function openScanner(mode) {
     return;
   }
 
-  // Accetta tutti i formati: il campo `mode` ("ean"/"qr") determina solo come
-  // INTERPRETIAMO il codice rilevato, non quali formati il lettore accetta.
-  // Senza qrbox lo scanner analizza l'INTERA immagine — molto più tollerante
-  // a inquadrature imprecise.
-  state.scanner = new Html5Qrcode("qr-reader");
+  // Restringi i formati accettati al tipo di codice che ci aspettiamo.
+  // SENZA questa restrizione il lettore può catturare i codici "Code 128"
+  // del distributore (lotto/SKU interni), che NON sono l'EAN del prodotto.
+  // Code 128 NON è in lista per EAN mode — quello è il bug che dava cifre
+  // sbagliate. Niente qrbox (immagine intera) per tolleranza inquadratura.
+  let scannerConfig = {};
+  if (typeof Html5QrcodeSupportedFormats !== "undefined") {
+    const formats = mode === "ean"
+      ? [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+        ]
+      : [Html5QrcodeSupportedFormats.QR_CODE];
+    scannerConfig = { formatsToSupport: formats };
+  }
+
+  state.scanner = new Html5Qrcode("qr-reader", scannerConfig);
   try {
     await state.scanner.start(
       { facingMode: "environment" },
@@ -371,17 +385,35 @@ async function onScanSuccess(decoded) {
       alert("Codice non riconosciuto come EAN.");
       return;
     }
+    // Lunghezze EAN/UPC tipiche: 8 (EAN-8), 12 (UPC-A), 13 (EAN-13), 14 (GTIN-14)
+    if (![8, 12, 13, 14].includes(digits.length)) {
+      const ok = confirm(
+        `Codice letto: ${digits}\n\n` +
+        `Ha ${digits.length} cifre, non corrisponde a un EAN/UPC standard ` +
+        `(8, 12, 13, o 14 cifre). Probabilmente è un codice interno del distributore, ` +
+        `non l'EAN del prodotto.\n\nVuoi usarlo lo stesso?`
+      );
+      if (!ok) return;
+    }
     $("#input-ean").value = digits;
     state.draft.ean = digits;
     saveSessionDebounced();
   } else {
-    // QR: estrai l'ID EPREL dall'URL
+    // QR mode: accetta SOLO QR EPREL ufficiali. Tante gomme hanno più QR
+    // (codici fornitore, marchi del distributore...) — l'unico utile è
+    // quello dell'etichetta UE che punta a eprel.ec.europa.eu/qr/<id> o
+    // /screen/product/tyres/<id>.
+    const isEprelUrl = /eprel\.ec\.europa\.eu/i.test(decoded);
     const m = decoded.match(/\/(?:qr|tyres)\/(\d+)/i);
-    const id = m ? m[1] : decoded.replace(/\D/g, "");
-    if (!id) {
-      alert("QR non riconosciuto. Atteso URL EPREL del tipo https://eprel.ec.europa.eu/qr/<id>");
+    if (!m || !isEprelUrl) {
+      alert(
+        "Questo non è un QR EPREL.\n\n" +
+        "Letto: " + decoded.substring(0, 120) + "\n\n" +
+        "Atteso un URL del tipo:\nhttps://eprel.ec.europa.eu/qr/<numero>"
+      );
       return;
     }
+    const id = m[1];
     $("#input-eprel").value = id;
     state.draft.eprel_id = id;
     saveSessionDebounced();
